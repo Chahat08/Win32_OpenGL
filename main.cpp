@@ -1,5 +1,6 @@
 #include <windows.h>
-#include <gl/GL.h>
+#include <glad/glad.h>
+#include <iostream>
 
 // Function prototypes
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -10,6 +11,8 @@ void Render();
 // Global variables
 HDC hDC;
 HGLRC hRC;
+GLuint shader;
+GLuint vbo, vao;
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     // Register window class
@@ -19,7 +22,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     wc.hInstance = hInstance;
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-    wc.lpszClassName = "MinimalOpenGL";
+    wc.lpszClassName = "Win32_OpenGL";
     RegisterClass(&wc);
 
     // Create window
@@ -87,12 +90,59 @@ void SetupOpenGL(HWND hWnd) {
     hRC = wglCreateContext(hDC);
     wglMakeCurrent(hDC, hRC);
 
+    if (!gladLoadGL())
+    {
+        std::cout << "Failed to initialize GLAD" << std::endl;
+    }
+
     // Setup basic OpenGL settings
     glViewport(0, 0, 800, 600);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glOrtho(-1, 1, -1, 1, -1, 1);
-    glMatrixMode(GL_MODELVIEW);
+
+    const char* vertexShaderSource = "#version 330 core\n"
+        "layout(location=0) in vec3 aPos;\n"
+        "void main(){\n"
+        "gl_Position=vec4(aPos, 1.0);\n"
+        "}\0";
+
+    const char* fragmentShaderSource = "#version 330 core\n"
+        "out vec4 fragColor;\n"
+        "void main(){\n"
+        "fragColor = vec4(1.0,0.0,1.0,1.0);\n"
+        "}\0";
+
+    GLuint vs = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vs, 1, &vertexShaderSource, NULL);
+    glCompileShader(vs);
+
+    GLuint fs = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fs, 1, &fragmentShaderSource, NULL);
+    glCompileShader(fs);
+
+    ::shader = glCreateProgram();
+    glAttachShader(shader, vs);
+    glAttachShader(shader, fs);
+    glLinkProgram(shader);
+    
+    glDeleteShader(vs);
+    glDeleteShader(fs);
+
+    float vertices[] = {
+                        -0.5, -0.2, 0.0,
+                         0.5, -0.2, 0.0,
+                         0.0,  0.3, 0.0
+    };
+
+    
+    glGenVertexArrays(1, &vao);
+    glBindVertexArray(vao);
+
+    glGenBuffers(1, &vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)NULL);
+    glEnableVertexAttribArray(0);
+    
 }
 
 void CleanupOpenGL(HWND hWnd) {
@@ -103,16 +153,10 @@ void CleanupOpenGL(HWND hWnd) {
 }
 
 void Render() {
-    // Clear the screen
     glClear(GL_COLOR_BUFFER_BIT);
 
-    // Draw a simple triangle
-    glBegin(GL_TRIANGLES);
-    glColor3f(1.0f, 0.0f, 0.0f);
-    glVertex2f(-0.5f, -0.5f);
-    glColor3f(0.0f, 1.0f, 0.0f);
-    glVertex2f(0.5f, -0.5f);
-    glColor3f(0.0f, 0.0f, 1.0f);
-    glVertex2f(0.0f, 0.5f);
-    glEnd();
+    glUseProgram(shader);
+    glEnableVertexAttribArray(vao);
+
+    glDrawArrays(GL_TRIANGLES, 0, 3);
 }
