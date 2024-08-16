@@ -152,9 +152,9 @@ void SetupOpenGL(HWND hWnd) {
     glDeleteShader(fs);
 
     float vertices[] = {
-                     -0.5, -0.2, 10.0,
-                         0.5, -0.2, 10.0,
-                         0.0,  0.3, 10.0
+                     -1.0, 1.0, -0.1,
+                     0.1, 1.0, -0.1,
+                     -1.0, 0.0, -0.1
     };
 
     
@@ -187,7 +187,6 @@ void Render() {
         callback->SetCallback(MakeCurrentCallback);
         renderWindow->AddObserver(vtkCommand::WindowMakeCurrentEvent, callback.GetPointer());
 
-        // Set up VTK rendering pipeline
         vtkNew<vtkPolyDataMapper> mapper;
         vtkNew<vtkActor> actor;
         actor->SetMapper(mapper.GetPointer());
