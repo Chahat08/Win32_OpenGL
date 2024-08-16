@@ -17,7 +17,7 @@
       "configurationType": "Release",
       "buildRoot": "${projectDir}\\out\\build\\${name}",
       "installRoot": "${projectDir}\\out\\install\\${name}",
-      "cmakeCommandArgs": "-DVTK_DIR=\"C:/dev/vtk/build\"",
+      "cmakeCommandArgs": "-DVTK_DIR=\"C:/dev/vtk/build1\"",
       "buildCommandArgs": "",
       "ctestCommandArgs": "",
       "inheritEnvironments": [ "msvc_x64_x64" ]

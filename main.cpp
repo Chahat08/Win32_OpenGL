@@ -1,6 +1,21 @@
 #include <windows.h>
 #include <glad/glad.h>
+
 #include <iostream>
+
+// VTK includes
+#include "vtkWindows.h"
+#include <ExternalVTKWidget.h>
+#include <vtkActor.h>
+#include <vtkCallbackCommand.h>
+#include <vtkCamera.h>
+#include <vtkCubeSource.h>
+#include <vtkExternalOpenGLRenderWindow.h>
+#include <vtkLight.h>
+#include <vtkNew.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkNamedColors.h>
+
 
 // Function prototypes
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -13,6 +28,16 @@ HDC hDC;
 HGLRC hRC;
 GLuint shader;
 GLuint vbo, vao;
+
+vtkNew<ExternalVTKWidget> externalVTKWidget;
+static bool initialized = false;
+
+static void MakeCurrentCallback(vtkObject* vtkNotUsed(caller), long unsigned int vtkNotUsed(eventId), void* vtkNotUsed(clientData), void* vtkNotUsed(callData)) {
+    if (initialized) {
+        wglMakeCurrent(hDC, hRC);
+    }
+}
+
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     // Register window class
@@ -127,9 +152,9 @@ void SetupOpenGL(HWND hWnd) {
     glDeleteShader(fs);
 
     float vertices[] = {
-                        -0.5, -0.2, 0.0,
-                         0.5, -0.2, 0.0,
-                         0.0,  0.3, 0.0
+                     -0.5, -0.2, 10.0,
+                         0.5, -0.2, 10.0,
+                         0.0,  0.3, 10.0
     };
 
     
@@ -143,6 +168,7 @@ void SetupOpenGL(HWND hWnd) {
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)NULL);
     glEnableVertexAttribArray(0);
     
+    
 }
 
 void CleanupOpenGL(HWND hWnd) {
@@ -153,10 +179,39 @@ void CleanupOpenGL(HWND hWnd) {
 }
 
 void Render() {
-    glClear(GL_COLOR_BUFFER_BIT);
+    if (!initialized) {
+        vtkNew<vtkExternalOpenGLRenderWindow> renderWindow;
+        externalVTKWidget->SetRenderWindow(renderWindow.GetPointer());
+
+        vtkNew<vtkCallbackCommand> callback;
+        callback->SetCallback(MakeCurrentCallback);
+        renderWindow->AddObserver(vtkCommand::WindowMakeCurrentEvent, callback.GetPointer());
+
+        // Set up VTK rendering pipeline
+        vtkNew<vtkPolyDataMapper> mapper;
+        vtkNew<vtkActor> actor;
+        actor->SetMapper(mapper.GetPointer());
+        vtkRenderer* renderer = externalVTKWidget->AddRenderer();
+        renderer->AddActor(actor.GetPointer());
+
+        vtkNew<vtkCubeSource> cs;
+        mapper->SetInputConnection(cs->GetOutputPort());
+        //actor->RotateX(45.0f);
+        //actor->RotateY(45.0f);
+        renderer->ResetCamera();
+
+        initialized = true;
+    }
+
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);
 
     glUseProgram(shader);
     glEnableVertexAttribArray(vao);
 
     glDrawArrays(GL_TRIANGLES, 0, 3);
+
+    externalVTKWidget->GetRenderWindow()->Render();
+
+    //SwapBuffers(hDC);
 }
