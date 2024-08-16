@@ -22,6 +22,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 void SetupOpenGL(HWND hWnd);
 void CleanupOpenGL(HWND hWnd);
 void Render();
+void vtkInitialize();
 
 // Global variables
 HDC hDC;
@@ -167,8 +168,6 @@ void SetupOpenGL(HWND hWnd) {
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)NULL);
     glEnableVertexAttribArray(0);
-    
-    
 }
 
 void CleanupOpenGL(HWND hWnd) {
@@ -178,29 +177,32 @@ void CleanupOpenGL(HWND hWnd) {
     ReleaseDC(hWnd, hDC);
 }
 
+void vtkInitialize() {
+    vtkNew<vtkExternalOpenGLRenderWindow> renderWindow;
+    externalVTKWidget->SetRenderWindow(renderWindow.GetPointer());
+
+    vtkNew<vtkCallbackCommand> callback;
+    callback->SetCallback(MakeCurrentCallback);
+    renderWindow->AddObserver(vtkCommand::WindowMakeCurrentEvent, callback.GetPointer());
+
+    vtkNew<vtkPolyDataMapper> mapper;
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper.GetPointer());
+    vtkRenderer* renderer = externalVTKWidget->AddRenderer();
+    renderer->AddActor(actor.GetPointer());
+
+    vtkNew<vtkCubeSource> cs;
+    mapper->SetInputConnection(cs->GetOutputPort());
+    //actor->RotateX(45.0f);
+    //actor->RotateY(45.0f);
+    renderer->ResetCamera();
+
+    initialized = true;
+}
+
 void Render() {
-    if (!initialized) {
-        vtkNew<vtkExternalOpenGLRenderWindow> renderWindow;
-        externalVTKWidget->SetRenderWindow(renderWindow.GetPointer());
-
-        vtkNew<vtkCallbackCommand> callback;
-        callback->SetCallback(MakeCurrentCallback);
-        renderWindow->AddObserver(vtkCommand::WindowMakeCurrentEvent, callback.GetPointer());
-
-        vtkNew<vtkPolyDataMapper> mapper;
-        vtkNew<vtkActor> actor;
-        actor->SetMapper(mapper.GetPointer());
-        vtkRenderer* renderer = externalVTKWidget->AddRenderer();
-        renderer->AddActor(actor.GetPointer());
-
-        vtkNew<vtkCubeSource> cs;
-        mapper->SetInputConnection(cs->GetOutputPort());
-        //actor->RotateX(45.0f);
-        //actor->RotateY(45.0f);
-        renderer->ResetCamera();
-
-        initialized = true;
-    }
+    if (!initialized) 
+        vtkInitialize();
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
