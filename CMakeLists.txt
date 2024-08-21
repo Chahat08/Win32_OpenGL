@@ -5,6 +5,8 @@ project(Win32_OpenGL_App)
 find_package(VTK COMPONENTS 
   CommonColor
   CommonCore
+  CommonDataModel
+  IOImage
   FiltersSources
   InteractionStyle
   RenderingContextOpenGL2
@@ -12,6 +14,8 @@ find_package(VTK COMPONENTS
   RenderingFreeType
   RenderingGL2PSOpenGL2
   RenderingOpenGL2
+  RenderingVolume
+  RenderingVolumeOpenGL2
   RenderingExternal
 )
 

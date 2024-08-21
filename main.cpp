@@ -2,6 +2,7 @@
 #include <glad/glad.h>
 
 #include <iostream>
+#include <array>
 
 // VTK includes
 #include "vtkWindows.h"
@@ -15,6 +16,14 @@
 #include <vtkNew.h>
 #include <vtkPolyDataMapper.h>
 #include <vtkNamedColors.h>
+#include <vtkCamera.h>
+#include <vtkColorTransferFunction.h>
+#include <vtkFixedPointVolumeRayCastMapper.h>
+#include <vtkMetaImageReader.h>
+#include <vtkPiecewiseFunction.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkVolume.h>
+#include <vtkVolumeProperty.h>
 
 
 // Function prototypes
@@ -51,7 +60,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     wc.lpszClassName = "Win32_OpenGL";
     RegisterClass(&wc);
 
-    // Create window
     HWND hWnd = CreateWindow(
         wc.lpszClassName,
         "OpenGL Window",
@@ -154,8 +162,8 @@ void SetupOpenGL(HWND hWnd) {
 
     float vertices[] = {
                      -1.0, 1.0, -0.1,
-                     0.1, 1.0, -0.1,
-                     -1.0, 0.0, -0.1
+                     1.0, 1.0, -0.1,
+                     -1.0, -1.0, -0.1
     };
 
     
@@ -185,17 +193,78 @@ void vtkInitialize() {
     callback->SetCallback(MakeCurrentCallback);
     renderWindow->AddObserver(vtkCommand::WindowMakeCurrentEvent, callback.GetPointer());
 
-    vtkNew<vtkPolyDataMapper> mapper;
-    vtkNew<vtkActor> actor;
-    actor->SetMapper(mapper.GetPointer());
-    vtkRenderer* renderer = externalVTKWidget->AddRenderer();
-    renderer->AddActor(actor.GetPointer());
+    vtkNew<vtkRenderWindowInteractor> iren;
+    iren->SetRenderWindow(renderWindow);
+    externalVTKWidget->GetRenderWindow()->SetInteractor(iren);
 
-    vtkNew<vtkCubeSource> cs;
-    mapper->SetInputConnection(cs->GetOutputPort());
-    //actor->RotateX(45.0f);
-    //actor->RotateY(45.0f);
-    renderer->ResetCamera();
+    /*vtkNew<vtkPolyDataMapper> mapper;
+    vtkNew<vtkActor> actor;
+    actor->SetMapper(mapper.GetPointer());*/
+    vtkRenderer* renderer = externalVTKWidget->AddRenderer();
+    //renderer->AddActor(actor.GetPointer());
+
+    //vtkNew<vtkCubeSource> cs;
+    //mapper->SetInputConnection(cs->GetOutputPort());
+    ////actor->RotateX(45.0f);
+    ////actor->RotateY(45.0f);
+    //renderer->ResetCamera();
+
+    vtkNew<vtkNamedColors> colors;
+
+    std::array<unsigned char, 4> bkg{ {51, 77, 102, 255} };
+    colors->SetColor("BkgColor", bkg.data());
+
+    vtkNew<vtkMetaImageReader> reader;
+    reader->SetFileName("data/FullHead/FullHead.mhd");
+
+    vtkNew<vtkFixedPointVolumeRayCastMapper> volumeMapper;
+    volumeMapper->SetInputConnection(reader->GetOutputPort());
+
+    vtkNew<vtkColorTransferFunction> volumeColor;
+    volumeColor->AddRGBPoint(0, 0.0, 0.0, 0.0);
+    volumeColor->AddRGBPoint(500, 240.0 / 255.0, 184.0 / 255.0, 160.0 / 255.0);
+    volumeColor->AddRGBPoint(1000, 240.0 / 255.0, 184.0 / 255.0, 160.0 / 255.0);
+    volumeColor->AddRGBPoint(1150, 1.0, 1.0, 240.0 / 255.0); // Ivory
+
+    vtkNew<vtkPiecewiseFunction> volumeScalarOpacity;
+    volumeScalarOpacity->AddPoint(0, 0.00);
+    volumeScalarOpacity->AddPoint(500, 0.15);
+    volumeScalarOpacity->AddPoint(1000, 0.15);
+    volumeScalarOpacity->AddPoint(1150, 0.85);
+
+    vtkNew<vtkPiecewiseFunction> volumeGradientOpacity;
+    volumeGradientOpacity->AddPoint(0, 0.0);
+    volumeGradientOpacity->AddPoint(90, 0.5);
+    volumeGradientOpacity->AddPoint(100, 1.0);
+
+    vtkNew<vtkVolumeProperty> volumeProperty;
+    volumeProperty->SetColor(volumeColor);
+    volumeProperty->SetScalarOpacity(volumeScalarOpacity);
+    volumeProperty->SetGradientOpacity(volumeGradientOpacity);
+    volumeProperty->SetInterpolationTypeToLinear();
+    volumeProperty->ShadeOn();
+    volumeProperty->SetAmbient(0.4);
+    volumeProperty->SetDiffuse(0.6);
+    volumeProperty->SetSpecular(0.2);
+
+    vtkNew<vtkVolume> volume;
+    volume->SetMapper(volumeMapper);
+    volume->SetProperty(volumeProperty);
+
+    std::cout << volume->GetBounds() << std::endl;
+    std::cout << volume->GetBounds() << std::endl;
+
+    renderer->AddViewProp(volume);
+
+    vtkCamera* camera = renderer->GetActiveCamera();
+    double* c = volume->GetCenter();
+    camera->SetViewUp(0, 0, -1);
+    camera->SetPosition(c[0], c[1] - 400, c[2]);
+    camera->SetFocalPoint(c[0], c[1], c[2]);
+    camera->Azimuth(30.0);
+    camera->Elevation(30.0);
+
+    renderer->SetBackground(colors->GetColor3d("BkgColor").GetData());
 
     initialized = true;
 }
@@ -204,13 +273,16 @@ void Render() {
     if (!initialized) 
         vtkInitialize();
 
+    // glClearColor(0.0, 1.0, 1.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
 
     glUseProgram(shader);
     glEnableVertexAttribArray(vao);
 
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+   glDrawArrays(GL_TRIANGLES, 0, 3);
+
+    //externalVTKWidget->GetRenderWindow()->GetInteractor()->Start();
 
     externalVTKWidget->GetRenderWindow()->Render();
 
